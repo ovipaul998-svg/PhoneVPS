@@ -6,6 +6,8 @@ import android.os.Build
 import android.os.Bundle
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.ConsoleMessage
+import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.chaquo.python.android.AndroidPlatform
@@ -26,7 +28,12 @@ class MainActivity : Activity() {
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.webViewClient = WebViewClient()
-        webView.webChromeClient = WebChromeClient()
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                Log.e("PhoneVPS-Web", message.message() + " -- line " + message.lineNumber() + " of " + message.sourceId())
+                return true
+            }
+        }
         webView.addJavascriptInterface(AppBridge(), "PhoneVPS")
         setContentView(webView)
         webView.loadUrl("file:///android_asset/web/index.html")
@@ -51,10 +58,15 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun runCommand(command: String): String = try {
+            Log.i("PhoneVPS", "Terminal command received: " + command.take(120))
             ensurePython()
-            Python.getInstance().getModule("phonevps").callAttr("execute_command", command, File(filesDir, "projects").absolutePath).toString()
-        } catch (e: Exception) {
-            "Command error: ${e.message}"
+            val result = Python.getInstance().getModule("phonevps")
+                .callAttr("execute_command", command, File(filesDir, "projects").absolutePath).toString()
+            Log.i("PhoneVPS", "Terminal command completed; output length=" + result.length)
+            result
+        } catch (e: Throwable) {
+            Log.e("PhoneVPS", "Terminal command failed", e)
+            "Command error: " + e.javaClass.simpleName + ": " + e.message
         }
 
         @JavascriptInterface
