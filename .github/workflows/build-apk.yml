@@ -12,6 +12,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify build Python
+        run: python3.11 --version
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
