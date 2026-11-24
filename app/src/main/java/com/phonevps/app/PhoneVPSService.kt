@@ -19,6 +19,9 @@ class PhoneVPSService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                try {
+                    if (Python.isStarted()) Python.getInstance().getModule("phonevps").callAttr("stop_bot")
+                } catch (_: Exception) { }
                 stopPythonServer()
                 running = false
                 lastError = ""
@@ -79,6 +82,9 @@ class PhoneVPSService : Service() {
     }
 
     override fun onDestroy() {
+        try {
+            if (Python.isStarted()) Python.getInstance().getModule("phonevps").callAttr("stop_bot")
+        } catch (_: Exception) { }
         stopPythonServer()
         running = false
         super.onDestroy()
