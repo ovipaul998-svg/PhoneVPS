@@ -7,7 +7,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import com.chaquo.python.AndroidPlatform
+import com.chaquo.python.android.AndroidPlatform
 import com.chaquo.python.Python
 
 class PhoneVPSService : Service() {
