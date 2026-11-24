@@ -1,0 +1,1 @@
+document.querySelectorAll("[data-tab]").forEach(button=>button.addEventListener("click",()=>{const names={terminal:"Terminal",files:"File manager",apps:"App hosting",monitor:"Monitoring"};alert(names[button.dataset.tab]+" is planned for a future PhoneVPS update. This preview currently contains the dashboard UI only.");}));
