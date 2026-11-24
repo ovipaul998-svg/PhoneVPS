@@ -67,31 +67,51 @@ class MainActivity : Activity() {
         fun hostingStatus(): String = if (PhoneVPSService.running) "Running" else "Stopped"
 
         @JavascriptInterface
-        fun filesList(): String = try {
-            val root = File(filesDir, "projects")
-            root.mkdirs()
-            JSONArray(root.listFiles()?.map { it.name } ?: emptyList<String>()).toString()
+        fun listFiles(folder: String): String = try {
+            val dir = safeWorkspacePath(folder)
+            dir.mkdirs()
+            val arr = JSONArray()
+            dir.listFiles()?.sortedBy { it.name.lowercase() }?.forEach { item ->
+                val obj = org.json.JSONObject()
+                obj.put("name", item.name)
+                obj.put("directory", item.isDirectory)
+                obj.put("size", item.length())
+                arr.put(obj)
+            }
+            arr.toString()
         } catch (e: Exception) { "[]" }
 
         @JavascriptInterface
-        fun readProjectFile(name: String): String = try {
-            val f = safeProjectFile(name)
-            if (f.isFile) f.readText() else ""
+        fun readFile(path: String): String = try {
+            val file = safeWorkspacePath(path)
+            if (file.isFile) file.readText() else ""
         } catch (e: Exception) { "File error: ${e.message}" }
 
         @JavascriptInterface
-        fun writeProjectFile(name: String, content: String): String = try {
-            val f = safeProjectFile(name)
-            f.parentFile?.mkdirs()
-            f.writeText(content)
-            "Saved ${f.name}"
+        fun saveFile(path: String, content: String): String = try {
+            val file = safeWorkspacePath(path)
+            file.parentFile?.mkdirs()
+            file.writeText(content)
+            "Saved: ${file.name}"
         } catch (e: Exception) { "File error: ${e.message}" }
 
-        private fun safeProjectFile(name: String): File {
-            require(name.isNotBlank() && !name.contains("..") && !name.startsWith("/")) { "Invalid file name" }
+        @JavascriptInterface
+        fun createFolder(path: String): String = try {
+            val dir = safeWorkspacePath(path)
+            if (dir.exists()) "Already exists" else if (dir.mkdirs()) "Folder created" else "Could not create folder"
+        } catch (e: Exception) { "Folder error: ${e.message}" }
+
+        @JavascriptInterface
+        fun deletePath(path: String): String = try {
+            val file = safeWorkspacePath(path)
+            if (!file.exists()) "Not found" else if (file.deleteRecursively()) "Deleted" else "Could not delete"
+        } catch (e: Exception) { "Delete error: ${e.message}" }
+
+        private fun safeWorkspacePath(path: String): File {
+            require(!path.startsWith("/") && !path.split("/").contains("..")) { "Invalid path" }
             val root = File(filesDir, "projects").canonicalFile
-            val file = File(root, name).canonicalFile
-            require(file.path.startsWith(root.path + File.separator)) { "Path outside project folder" }
+            val file = File(root, path).canonicalFile
+            require(file == root || file.path.startsWith(root.path + File.separator)) { "Path outside workspace" }
             return file
         }
 
