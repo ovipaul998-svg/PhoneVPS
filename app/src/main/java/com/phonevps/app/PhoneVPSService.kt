@@ -21,18 +21,26 @@ class PhoneVPSService : Service() {
             ACTION_STOP -> {
                 stopPythonServer()
                 running = false
+                lastError = ""
                 stopForeground(true)
                 stopSelf()
                 return START_NOT_STICKY
             }
             else -> {
                 startForeground(NOTIFICATION_ID, buildNotification())
+                running = false
+                lastError = ""
                 try {
                     if (!Python.isStarted()) Python.start(AndroidPlatform(applicationContext))
-                    Python.getInstance().getModule("phonevps")
-                        .callAttr("start_server", filesDir.absolutePath, SERVER_PORT)
-                    running = true
+                    val result = Python.getInstance().getModule("phonevps")
+                        .callAttr("start_server", filesDir.absolutePath, SERVER_PORT).toString()
+                    if (result == "started" || result == "already running") {
+                        running = true
+                    } else {
+                        throw IllegalStateException("Server did not start: $result")
+                    }
                 } catch (e: Exception) {
+                    lastError = e.message ?: e.javaClass.simpleName
                     running = false
                     stopForeground(true)
                     stopSelf()
@@ -85,5 +93,6 @@ class PhoneVPSService : Service() {
         private const val CHANNEL_ID = "phonevps_hosting"
         private const val NOTIFICATION_ID = 4401
         @Volatile var running: Boolean = false
+        @Volatile var lastError: String = ""
     }
 }
