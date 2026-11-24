@@ -12,8 +12,8 @@ android {
         applicationId = "com.phonevps.app"
         minSdk = 24
         targetSdk = 28
-        versionCode = 5
-        versionName = "1.5"
+        versionCode = 6
+        versionName = "1.6"
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
