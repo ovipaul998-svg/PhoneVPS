@@ -62,13 +62,13 @@ def execute_command(command, workspace_path):
                     "pwd, ls [path], cd [path], mkdir [-p] name, touch name, "
                     "cat file, rm [-r] path, echo text > file, python file.py, "
                     "python -c \"code\", whoami, uname, clear, help\n"
-                    "Python packages and arbitrary Linux binaries are not yet included.")
+                    "This is an Android shell, not Ubuntu. pip packages and arbitrary Linux binaries are not included.")
         if cmd == "pwd":
             return _current_dir
         if cmd == "whoami":
             return "phonevps"
         if cmd == "uname":
-            return "PhoneVPS Android userspace (not Ubuntu)"
+            return "PhoneVPS Android userspace (not Ubuntu; LAN-hosted)"
         if cmd == "ls":
             target = _safe_path(args[0] if args else ".")
             if not os.path.isdir(target):
@@ -146,7 +146,7 @@ def start_server(app_files_dir, port=8080):
             with open(index, "w", encoding="utf-8") as f:
                 f.write("<!doctype html><meta name='viewport' content='width=device-width'><h1>PhoneVPS is online</h1><p>Edit projects/index.html in PhoneVPS.</p>")
         handler = lambda *args, **kwargs: SimpleHTTPRequestHandler(*args, directory=root, **kwargs)
-        server = ThreadingHTTPServer(("127.0.0.1", int(port)), handler)
+        server = ThreadingHTTPServer(("0.0.0.0", int(port)), handler)
         server.daemon_threads = True
         thread = threading.Thread(target=server.serve_forever, name="PhoneVPS-HTTP", daemon=True)
         thread.start()
