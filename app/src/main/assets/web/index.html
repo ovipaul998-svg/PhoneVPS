@@ -1,7 +1,31 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PhoneVPS</title><link rel="stylesheet" href="style.css"></head>
-<body><header><div class="brand"><span class="logo">P</span><div><b>PhoneVPS</b><small>LOCAL SERVER CONTROL</small></div></div><span class="status"><i></i> Device mode</span></header>
-<main><section class="welcome"><p class="eyebrow">CONTROL CENTER</p><h1>Your phone.<br><em>Your server.</em></h1><p class="muted">A mobile dashboard for your local development environment.</p></section>
-<section class="stats"><article><small>CPU</small><strong id="cpu">--</strong><span>Usage estimate unavailable</span></article><article><small>MEMORY</small><strong id="memory">--</strong><span>Live metrics not connected</span></article><article><small>STATUS</small><strong class="green">Ready</strong><span>Dashboard is running</span></article></section>
-<section class="section"><div class="section-head"><h2>Workspace</h2><span>PHASE 1</span></div><div class="cards"><button class="tile" data-tab="terminal"><b>⌘</b><strong>Terminal</strong><small>Command interface (coming soon)</small></button><button class="tile" data-tab="files"><b>▤</b><strong>File manager</strong><small>Browse project files (coming soon)</small></button><button class="tile" data-tab="apps"><b>▣</b><strong>App hosting</strong><small>Python · Node.js · Discord bots</small></button><button class="tile" data-tab="monitor"><b>◷</b><strong>Monitoring</strong><small>Resource metrics (coming soon)</small></button></div></section>
-<section class="notice"><b>Development preview</b><p>This build is the dashboard shell only. It does not yet run Ubuntu, host bots, execute shell commands, or provide guaranteed 24/7 uptime. Those require a secure Android-side service layer.</p></section><footer>PhoneVPS <span>v1.0 · Android</span></footer></main><script src="app.js"></script></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PhoneVPS</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div class="brand"><span class="logo">P</span><div><b>PhoneVPS</b><small>LOCAL SERVER CONTROL</small></div></div><span class="status"><i></i> ANDROID HOST</span></header>
+<main>
+<section class="welcome"><p class="eyebrow">CONTROL CENTER</p><h1>Your phone.<br><em>Your server.</em></h1><p class="muted">Run Python, Node.js and bot processes through the Termux engine.</p></section>
+<section class="stats"><article><small>ENGINE</small><strong id="engineStatus">Checking</strong><span id="engineDetail">Checking Termux connection</span></article><article><small>HOST MODE</small><strong>Local</strong><span>Runs on this phone</span></article><article><small>STATUS</small><strong class="green">Ready</strong><span>PhoneVPS dashboard active</span></article></section>
+<section class="section"><div class="section-head"><h2>Server controls</h2><span>TERMUX ENGINE</span></div>
+<div class="cards">
+<button class="tile" id="installTools"><b>＋</b><strong>Install runtime</strong><small>Install Python and Node.js</small></button>
+<button class="tile" id="startPython"><b>▶</b><strong>Start Python server</strong><small>HTTP server on port 8080</small></button>
+<button class="tile" id="stopPython"><b>■</b><strong>Stop Python server</strong><small>Stop PhoneVPS demo server</small></button>
+<button class="tile" id="openTermux"><b>⌘</b><strong>Open Termux</strong><small>View sessions and command output</small></button>
+</div></section>
+<section class="section"><div class="section-head"><h2>Terminal command</h2><span>ADVANCED</span></div>
+<div class="terminal"><p class="muted">Commands run inside your Termux environment. Background commands continue after leaving PhoneVPS, subject to Android power management.</p>
+<textarea id="command" rows="3" placeholder="Example: python --version"></textarea>
+<button class="action" id="runCommand">Run in background</button>
+<div id="message" class="message">Waiting for Termux setup.</div></div></section>
+<section class="notice"><b>Required one-time setup</b><ol>
+<li>Install and open Termux (prefer the official F-Droid or GitHub build).</li>
+<li>In Termux, run <code>mkdir -p ~/.termux && echo 'allow-external-apps = true' >> ~/.termux/termux.properties</code>, then restart Termux.</li>
+<li>Android Settings → Apps → PhoneVPS → Permissions → Additional permissions → allow <b>Run commands in Termux environment</b>.</li>
+<li>Disable battery optimization for Termux. For automatic startup after reboot, install and open Termux:Boot.</li>
+</ol><p>Background hosting is not guaranteed 24/7. Android may stop processes due to battery controls, overheating, low memory or network changes.</p></section>
+<footer>PhoneVPS <span>v1.1 · Termux-powered preview</span></footer>
+</main><script src="app.js"></script></body></html>
