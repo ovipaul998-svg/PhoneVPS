@@ -8,7 +8,7 @@ function setServerState(status){
  $("hostState").className=online?"green":status.startsWith("Error")?"red":"";
  $("hostDetail").textContent=online?"Serving /projects on port 8080":status.startsWith("Error")?"Startup failed":"Not hosting";
  $("topStatus").innerHTML="<i></i> "+(online?"ONLINE":status.toUpperCase());
- $("serverMessage").textContent=online?"Server is ONLINE at http://127.0.0.1:8080":status.startsWith("Error")?status:"Server is offline.";
+ $("serverMessage").textContent=online?"Server is ONLINE · Local: http://127.0.0.1:8080 · LAN: http://"+(PhoneVPS.lanAddress?PhoneVPS.lanAddress():"your-phone-ip")+":8080":status.startsWith("Error")?status:"Server is offline.";
 }
 function refresh(){
  try{
