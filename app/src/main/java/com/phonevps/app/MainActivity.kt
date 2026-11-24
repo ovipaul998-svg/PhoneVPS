@@ -70,6 +70,35 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface
+        fun startBot(filename: String): String = try {
+            ensurePython()
+            Python.getInstance().getModule("phonevps")
+                .callAttr("start_bot", File(filesDir, "projects").absolutePath, filename).toString()
+        } catch (e: Throwable) {
+            "Bot start error: ${e.javaClass.simpleName}: ${e.message}"
+        }
+
+        @JavascriptInterface
+        fun stopBot(): String = try {
+            ensurePython()
+            Python.getInstance().getModule("phonevps").callAttr("stop_bot").toString()
+        } catch (e: Throwable) {
+            "Bot stop error: ${e.javaClass.simpleName}: ${e.message}"
+        }
+
+        @JavascriptInterface
+        fun botStatus(): String = try {
+            ensurePython()
+            Python.getInstance().getModule("phonevps").callAttr("bot_status").toString()
+        } catch (e: Throwable) { "error: ${e.message}" }
+
+        @JavascriptInterface
+        fun botLogs(): String = try {
+            ensurePython()
+            Python.getInstance().getModule("phonevps").callAttr("bot_logs").toString()
+        } catch (e: Throwable) { "Bot log error: ${e.message}" }
+
+        @JavascriptInterface
         fun startHosting(): String = try {
             val intent = Intent(this@MainActivity, PhoneVPSService::class.java).setAction(PhoneVPSService.ACTION_START)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
