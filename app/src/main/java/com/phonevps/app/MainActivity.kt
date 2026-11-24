@@ -40,17 +40,24 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun runPython(code: String): String = try {
             ensurePython()
-            Python.getInstance().getModule("phonevps").callAttr("execute", code).toString()
+            Python.getInstance().getModule("phonevps").callAttr("execute", code, File(filesDir, "projects").absolutePath).toString()
         } catch (e: Exception) {
             "Python error: ${e.message}"
         }
 
         @JavascriptInterface
+        fun runCommand(command: String): String = try {
+            ensurePython()
+            Python.getInstance().getModule("phonevps").callAttr("execute_command", command, File(filesDir, "projects").absolutePath).toString()
+        } catch (e: Exception) {
+            "Command error: ${e.message}"
+        }
+
+        @JavascriptInterface
         fun startHosting(): String = try {
-            val intent = Intent(this@MainActivity, PhoneVPSService::class.java)
-                .setAction(PhoneVPSService.ACTION_START)
+            val intent = Intent(this@MainActivity, PhoneVPSService::class.java).setAction(PhoneVPSService.ACTION_START)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
-            "Hosting service start requested. Check the persistent PhoneVPS notification."
+            "Starting server…"
         } catch (e: Exception) {
             "Could not start hosting: ${e.message}"
         }
@@ -64,7 +71,11 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface
-        fun hostingStatus(): String = if (PhoneVPSService.running) "Running" else "Stopped"
+        fun hostingStatus(): String = when {
+            PhoneVPSService.lastError.isNotEmpty() -> "Error: " + PhoneVPSService.lastError
+            PhoneVPSService.running -> "Online"
+            else -> "Offline"
+        }
 
         @JavascriptInterface
         fun listFiles(folder: String): String = try {
