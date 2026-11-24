@@ -12,8 +12,8 @@ android {
         applicationId = "com.phonevps.app"
         minSdk = 24
         targetSdk = 28
-        versionCode = 7
-        versionName = "1.7"
+        versionCode = 8
+        versionName = "1.8"
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
@@ -32,5 +32,10 @@ android {
 chaquopy {
     defaultConfig {
         version = "3.11"
+        pip {
+            // Bundle Discord.py and its Android-compatible HTTP dependency.
+            install("discord.py==2.5.2")
+            install("aiohttp==3.10.10")
+        }
     }
 }
