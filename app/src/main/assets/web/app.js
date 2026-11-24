@@ -92,6 +92,29 @@ $("runFile").onclick=()=>{
  renderTerminal();
 };
 $("deleteFile").onclick=()=>{const path=$("fileName").value;if(!path||!confirm("Delete "+path+"?"))return;$("fileMessage").textContent=PhoneVPS.deletePath(path);$("fileEditor").hidden=true;loadFiles();};
+function refreshBot(){
+ if(!bridge())return;
+ try{
+  const state=PhoneVPS.botStatus();
+  $("botState").textContent="Bot status: "+state;
+  $("botState").className="message "+(state==="running"?"green":state==="error"?"red":"");
+  $("botLogs").textContent=PhoneVPS.botLogs();
+ }catch(e){$("botState").textContent="Bot bridge error: "+String(e);}
+}
+$("startBot").onclick=()=>{
+ const filename=$("botFile").value.trim()||"main.py";
+ try{
+  $("botState").textContent=PhoneVPS.startBot(filename);
+  setTimeout(refreshBot,400);
+  setTimeout(refreshBot,1400);
+ }catch(e){$("botState").textContent="Start failed: "+String(e);}
+};
+$("stopBot").onclick=()=>{
+ try{$("botState").textContent=PhoneVPS.stopBot();setTimeout(refreshBot,500);}
+ catch(e){$("botState").textContent="Stop failed: "+String(e);}
+};
+$("refreshBot").onclick=refreshBot;
+setInterval(()=>{if(!$("bot").hidden)refreshBot();},1500);
 renderTerminal();
 refresh();
 setInterval(()=>{if(bridge())try{setServerState(PhoneVPS.hostingStatus());}catch(e){terminalLog("STATUS ERROR: "+String(e));}},2000);
