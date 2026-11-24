@@ -1,4 +1,5 @@
 import contextlib
+import asyncio
 import io
 import os
 import shlex
@@ -165,3 +166,118 @@ def stop_server():
 
 def server_status():
     return "running" if _server is not None and _server_thread is not None and _server_thread.is_alive() else "stopped"
+
+
+# Managed user-script runner; always reads the file saved in /projects.
+_bot_lock = threading.RLock()
+_bot_thread = None
+_bot_state = "stopped"
+_bot_logs = []
+_bot_client = None
+_bot_loop = None
+
+class _BotLogStream:
+    def write(self, value):
+        if value:
+            with _bot_lock:
+                _bot_logs.extend(str(value).splitlines())
+                del _bot_logs[:-400]
+    def flush(self):
+        pass
+
+def bot_status():
+    with _bot_lock:
+        if _bot_thread is None or not _bot_thread.is_alive():
+            return "stopped" if _bot_state == "running" else _bot_state
+        return _bot_state
+
+def bot_logs():
+    with _bot_lock:
+        return "\\n".join(_bot_logs[-200:]) or "No bot output yet."
+
+def start_bot(workspace_path, filename="main.py"):
+    global _bot_thread, _bot_state, _bot_client, _bot_loop
+    root = _set_workspace(workspace_path)
+    target = os.path.abspath(os.path.join(root, filename))
+    if target == root or not target.startswith(root + os.sep):
+        return "ERROR: Bot file must be inside /projects."
+    if not os.path.isfile(target):
+        return "ERROR: " + filename + " was not found in PhoneVPS Files."
+    with _bot_lock:
+        if _bot_thread is not None and _bot_thread.is_alive():
+            return "Bot runner is already active."
+        _bot_logs.clear()
+        _bot_logs.append("Loading saved file: /projects/" + filename)
+        _bot_state = "starting"
+        _bot_client = None
+        _bot_loop = None
+
+    def worker():
+        global _bot_state, _bot_client, _bot_loop
+        stream = _BotLogStream()
+        try:
+            with open(target, "r", encoding="utf-8") as handle:
+                source = handle.read()
+            scope = {"__name__": "__main__", "__file__": target,
+                     "__builtins__": __builtins__}
+            try:
+                import discord
+                def managed_run(client, token, **kwargs):
+                    global _bot_client, _bot_loop, _bot_state
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    with _bot_lock:
+                        _bot_client, _bot_loop = client, loop
+                        _bot_state = "running"
+                        _bot_logs.append("Discord client connecting…")
+                    try:
+                        loop.run_until_complete(client.start(token, reconnect=kwargs.get("reconnect", True)))
+                    finally:
+                        if not loop.is_closed():
+                            pending = asyncio.all_tasks(loop)
+                            for task in pending:
+                                task.cancel()
+                            if pending:
+                                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                            loop.close()
+                        asyncio.set_event_loop(None)
+                discord.Client.run = managed_run
+            except ImportError:
+                with _bot_lock:
+                    _bot_logs.append("ERROR: discord.py is not installed in this APK.")
+            with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
+                exec(compile(source, target, "exec"), scope, scope)
+            with _bot_lock:
+                if _bot_state not in ("error", "stopping"):
+                    _bot_state = "stopped"
+                _bot_logs.append("Bot script exited.")
+        except BaseException:
+            with _bot_lock:
+                _bot_state = "error"
+                _bot_logs.extend(traceback.format_exc().splitlines())
+                del _bot_logs[:-400]
+        finally:
+            with _bot_lock:
+                if _bot_state == "stopping":
+                    _bot_state = "stopped"
+                _bot_client = None
+                _bot_loop = None
+
+    _bot_thread = threading.Thread(target=worker, name="PhoneVPS-Bot", daemon=True)
+    _bot_thread.start()
+    return "Started saved file /projects/" + filename
+
+def stop_bot():
+    global _bot_state
+    with _bot_lock:
+        if _bot_thread is None or not _bot_thread.is_alive():
+            _bot_state = "stopped"
+            return "Bot is already stopped."
+        _bot_state = "stopping"
+        if _bot_client is not None and _bot_loop is not None and not _bot_loop.is_closed():
+            try:
+                asyncio.run_coroutine_threadsafe(_bot_client.close(), _bot_loop)
+                return "Stop requested for Discord client."
+            except Exception as exc:
+                _bot_logs.append("Stop error: " + str(exc))
+        return "Stop requested. A script that blocks without a stoppable client may require app restart."
