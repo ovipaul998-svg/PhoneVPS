@@ -12,6 +12,8 @@ import com.chaquo.python.android.AndroidPlatform
 import com.chaquo.python.Python
 import org.json.JSONArray
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
@@ -73,8 +75,24 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun hostingStatus(): String = when {
             PhoneVPSService.lastError.isNotEmpty() -> "Error: " + PhoneVPSService.lastError
-            PhoneVPSService.running -> "Online"
+            PhoneVPSService.running && isHttpServerResponding() -> "Online"
+            PhoneVPSService.running -> "Starting / Not responding"
             else -> "Offline"
+        }
+
+        private fun isHttpServerResponding(): Boolean {
+            var connection: HttpURLConnection? = null
+            return try {
+                connection = URL("http://127.0.0.1:${PhoneVPSService.SERVER_PORT}/").openConnection() as HttpURLConnection
+                connection.connectTimeout = 700
+                connection.readTimeout = 700
+                connection.requestMethod = "GET"
+                connection.responseCode in 200..299
+            } catch (_: Exception) {
+                false
+            } finally {
+                connection?.disconnect()
+            }
         }
 
         @JavascriptInterface
