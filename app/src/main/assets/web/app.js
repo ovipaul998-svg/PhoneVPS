@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 let currentFolder="";
-let terminalHistory=["PhoneVPS shell ready. Type help to see supported commands."];
+let terminalHistory=["PhoneVPS terminal initialized.","Type help to see supported commands."];
 function bridge(){return typeof window.PhoneVPS!=="undefined";}
 function setServerState(status){
  const online=status==="Online";
@@ -11,11 +11,13 @@ function setServerState(status){
  $("serverMessage").textContent=online?"Server is ONLINE at http://127.0.0.1:8080":status.startsWith("Error")?status:"Server is offline.";
 }
 function refresh(){
- if(!bridge()){$("pythonState").textContent="Unavailable";$("pythonDetail").textContent="Native app bridge missing";setServerState("Error: app bridge missing");return;}
- const ok=PhoneVPS.pythonReady();
- $("pythonState").textContent=ok?"Ready":"Error";
- $("pythonDetail").textContent=ok?"Embedded Python 3.11":"Python runtime failed";
- setServerState(PhoneVPS.hostingStatus());
+ try{
+  if(!bridge()){$("pythonState").textContent="Unavailable";$("pythonDetail").textContent="Native app bridge missing";setServerState("Error: app bridge missing");return;}
+  const ok=PhoneVPS.pythonReady();
+  $("pythonState").textContent=ok?"Ready":"Error";
+  $("pythonDetail").textContent=ok?"Embedded Python 3.11":"Python runtime failed — check app installation";
+  setServerState(PhoneVPS.hostingStatus());
+ }catch(e){$("pythonState").textContent="Error";$("pythonDetail").textContent=String(e);setServerState("Error: "+String(e));}
 }
 function showTab(tab){
  document.querySelectorAll(".view").forEach(x=>x.hidden=x.id!==tab);
@@ -29,14 +31,18 @@ $("openServer").onclick=()=>{if(PhoneVPS.hostingStatus()==="Online")window.open(
 $("refresh").onclick=refresh;
 $("terminalRun").onclick=runTerminal;
 $("terminalInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();runTerminal();}});
+function renderTerminal(){ $("terminalOutput").textContent=terminalHistory.slice(-150).join("\n"); $("terminalOutput").scrollTop=$("terminalOutput").scrollHeight; }
 function runTerminal(){
  const command=$("terminalInput").value.trim();if(!command)return;
- const result=PhoneVPS.runCommand(command);
- if(result==="__CLEAR__")terminalHistory=[];
- else terminalHistory.push("$ "+command,result);
- $("terminalOutput").textContent=terminalHistory.slice(-100).join("\n");
  $("terminalInput").value="";
- $("terminalOutput").scrollTop=$("terminalOutput").scrollHeight;
+ if(!bridge()){terminalHistory.push("$ "+command,"ERROR: Native PhoneVPS bridge is unavailable.");renderTerminal();return;}
+ terminalHistory.push("$ "+command);
+ try{
+  const result=PhoneVPS.runCommand(command);
+  if(result==="__CLEAR__")terminalHistory=[];
+  else terminalHistory.push(result===null||result===undefined?"ERROR: PhoneVPS returned no result.":String(result));
+ }catch(e){terminalHistory.push("TERMINAL ERROR: "+(e&&e.stack?e.stack:String(e)));}
+ renderTerminal();
 }
 function loadFiles(){
  if(!bridge())return;
@@ -64,7 +70,7 @@ $("newFile").onclick=()=>{$("fileEditor").hidden=false;$("fileName").value=curre
 $("newFolder").onclick=()=>{const name=prompt("Enter folder name");if(!name)return;const path=currentFolder?currentFolder+"/"+name:name;$("fileMessage").textContent=PhoneVPS.createFolder(path);loadFiles();};
 $("reloadFiles").onclick=loadFiles;
 $("saveFile").onclick=()=>{const name=$("fileName").value.trim();if(!name){$("fileMessage").textContent="Enter a file name first.";return;}const result=PhoneVPS.saveFile(name,$("fileContent").value);$("fileMessage").textContent=result;loadFiles();};
-$("runFile").onclick=()=>{const name=$("fileName").value.trim();if(!name){$("fileMessage").textContent="Save a Python file first.";return;}const result=PhoneVPS.runCommand("python "+JSON.stringify(name));terminalHistory.push("$ python "+name,result);$("fileMessage").textContent="Output: "+result;};
+$("runFile").onclick=()=>{const name=$("fileName").value.trim();if(!name){$("fileMessage").textContent="Save a Python file first.";return;}try{const result=PhoneVPS.runCommand("python "+JSON.stringify(name));terminalHistory.push("$ python "+name,String(result));renderTerminal();$("fileMessage").textContent="Finished. See Terminal tab for output.";}catch(e){terminalHistory.push("RUN ERROR: "+String(e));renderTerminal();$("fileMessage").textContent="Run failed: "+String(e);}};
 $("deleteFile").onclick=()=>{const path=$("fileName").value;if(!path||!confirm("Delete "+path+"?"))return;$("fileMessage").textContent=PhoneVPS.deletePath(path);$("fileEditor").hidden=true;loadFiles();};
 refresh();
 setInterval(()=>{if(bridge())setServerState(PhoneVPS.hostingStatus());},2000);
