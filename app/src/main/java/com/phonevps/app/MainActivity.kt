@@ -71,6 +71,8 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun startBot(filename: String): String = try {
+            val serviceIntent = Intent(this@MainActivity, PhoneVPSService::class.java).setAction(PhoneVPSService.ACTION_START)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent) else startService(serviceIntent)
             ensurePython()
             Python.getInstance().getModule("phonevps")
                 .callAttr("start_bot", File(filesDir, "projects").absolutePath, filename).toString()
