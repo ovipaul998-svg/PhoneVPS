@@ -14,6 +14,8 @@ import org.json.JSONArray
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.NetworkInterface
+import java.net.Inet4Address
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
@@ -71,6 +73,15 @@ class MainActivity : Activity() {
         } catch (e: Exception) {
             "Could not stop hosting: ${e.message}"
         }
+
+        @JavascriptInterface
+        fun lanAddress(): String = try {
+            val addresses = NetworkInterface.getNetworkInterfaces().toList()
+                .flatMap { it.inetAddresses.toList() }
+                .filterIsInstance<Inet4Address>()
+                .filter { !it.isLoopbackAddress && it.isSiteLocalAddress }
+            addresses.firstOrNull()?.hostAddress ?: "Connect to Wi-Fi to get a LAN address"
+        } catch (_: Exception) { "LAN address unavailable" }
 
         @JavascriptInterface
         fun hostingStatus(): String = when {
