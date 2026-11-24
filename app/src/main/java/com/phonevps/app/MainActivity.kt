@@ -8,7 +8,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import com.chaquo.python.AndroidPlatform
+import com.chaquo.python.android.AndroidPlatform
 import com.chaquo.python.Python
 import org.json.JSONArray
 import java.io.File
