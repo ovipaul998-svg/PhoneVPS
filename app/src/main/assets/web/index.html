@@ -1,31 +1,20 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PhoneVPS</title><link rel="stylesheet" href="style.css">
-</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PhoneVPS</title><link rel="stylesheet" href="style.css"></head>
 <body>
-<header><div class="brand"><span class="logo">P</span><div><b>PhoneVPS</b><small>LOCAL SERVER CONTROL</small></div></div><span class="status"><i></i> ANDROID HOST</span></header>
+<header><div class="brand"><span class="logo">P</span><div><b>PhoneVPS</b><small>STANDALONE SERVER CONTROL</small></div></div><span class="status"><i></i> ANDROID</span></header>
 <main>
-<section class="welcome"><p class="eyebrow">CONTROL CENTER</p><h1>Your phone.<br><em>Your server.</em></h1><p class="muted">Run Python, Node.js and bot processes through the Termux engine.</p></section>
-<section class="stats"><article><small>ENGINE</small><strong id="engineStatus">Checking</strong><span id="engineDetail">Checking Termux connection</span></article><article><small>HOST MODE</small><strong>Local</strong><span>Runs on this phone</span></article><article><small>STATUS</small><strong class="green">Ready</strong><span>PhoneVPS dashboard active</span></article></section>
-<section class="section"><div class="section-head"><h2>Server controls</h2><span>TERMUX ENGINE</span></div>
-<div class="cards">
-<button class="tile" id="installTools"><b>＋</b><strong>Install runtime</strong><small>Install Python and Node.js</small></button>
-<button class="tile" id="startPython"><b>▶</b><strong>Start Python server</strong><small>HTTP server on port 8080</small></button>
-<button class="tile" id="stopPython"><b>■</b><strong>Stop Python server</strong><small>Stop PhoneVPS demo server</small></button>
-<button class="tile" id="openTermux"><b>⌘</b><strong>Open Termux</strong><small>View sessions and command output</small></button>
+<section class="welcome"><p class="eyebrow">CONTROL CENTER · V1.2</p><h1>Your phone.<br><em>Your server.</em></h1><p class="muted">Embedded Python runtime. No Termux. No root.</p></section>
+<section class="stats"><article><small>PYTHON ENGINE</small><strong id="pythonState">Checking</strong><span id="pythonDetail">Embedded runtime</span></article><article><small>HOSTING</small><strong id="hostState">Stopped</strong><span>Foreground service</span></article><article><small>PORT</small><strong>8080</strong><span>Local HTTP server</span></article></section>
+<section class="section"><div class="section-head"><h2>Server controls</h2><span>ON-DEVICE</span></div><div class="cards">
+<button class="tile" id="start"><b>▶</b><strong>Start hosting</strong><small>Run the built-in Python web server</small></button>
+<button class="tile" id="stop"><b>■</b><strong>Stop hosting</strong><small>Stop the background service</small></button>
+<button class="tile" id="openServer"><b>↗</b><strong>Open hosted page</strong><small>127.0.0.1:8080</small></button>
+<button class="tile" id="refresh"><b>↻</b><strong>Refresh status</strong><small>Check embedded Python engine</small></button>
 </div></section>
-<section class="section"><div class="section-head"><h2>Terminal command</h2><span>ADVANCED</span></div>
-<div class="terminal"><p class="muted">Commands run inside your Termux environment. Background commands continue after leaving PhoneVPS, subject to Android power management.</p>
-<textarea id="command" rows="3" placeholder="Example: python --version"></textarea>
-<button class="action" id="runCommand">Run in background</button>
-<div id="message" class="message">Waiting for Termux setup.</div></div></section>
-<section class="notice"><b>Required one-time setup</b><ol>
-<li>Install and open Termux (prefer the official F-Droid or GitHub build).</li>
-<li>In Termux, run <code>mkdir -p ~/.termux && echo 'allow-external-apps = true' >> ~/.termux/termux.properties</code>, then restart Termux.</li>
-<li>Android Settings → Apps → PhoneVPS → Permissions → Additional permissions → allow <b>Run commands in Termux environment</b>.</li>
-<li>Disable battery optimization for Termux. For automatic startup after reboot, install and open Termux:Boot.</li>
-</ol><p>Background hosting is not guaranteed 24/7. Android may stop processes due to battery controls, overheating, low memory or network changes.</p></section>
-<footer>PhoneVPS <span>v1.1 · Termux-powered preview</span></footer>
+<section class="section"><div class="section-head"><h2>Python console</h2><span>EMBEDDED PYTHON 3.11</span></div><div class="terminal"><textarea id="code" rows="4" spellcheck="false">print("Hello from PhoneVPS!")
+import sys
+print(sys.version)</textarea><button class="action" id="run">Run Python</button><pre id="output">Python console ready.</pre></div></section>
+<section class="notice"><b>Standalone runtime</b><p>Python runs inside this app. The hosting service displays an ongoing Android notification while active. This first standalone release includes Python and a local web server; Node.js runtime integration and full Ubuntu compatibility are still in development.</p></section>
+<footer>PhoneVPS <span>v1.2 · Embedded Python</span></footer>
 </main><script src="app.js"></script></body></html>

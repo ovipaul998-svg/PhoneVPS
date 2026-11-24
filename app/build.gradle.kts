@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.chaquo.python")
 }
 
 android {
@@ -9,10 +10,13 @@ android {
 
     defaultConfig {
         applicationId = "com.phonevps.app"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 28
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.2"
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     compileOptions {
@@ -22,5 +26,11 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+}
+
+chaquopy {
+    defaultConfig {
+        version = "3.11"
     }
 }

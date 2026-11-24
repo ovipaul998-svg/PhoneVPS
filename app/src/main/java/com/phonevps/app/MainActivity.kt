@@ -2,12 +2,16 @@ package com.phonevps.app
 
 import android.app.Activity
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.chaquo.python.AndroidPlatform
+import com.chaquo.python.Python
+import org.json.JSONArray
+import java.io.File
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
@@ -19,54 +23,80 @@ class MainActivity : Activity() {
         webView.settings.domStorageEnabled = true
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = WebChromeClient()
-        webView.addJavascriptInterface(TermuxBridge(), "PhoneVPS")
+        webView.addJavascriptInterface(AppBridge(), "PhoneVPS")
         setContentView(webView)
         webView.loadUrl("file:///android_asset/web/index.html")
     }
 
-    inner class TermuxBridge {
+    inner class AppBridge {
         @JavascriptInterface
-        fun isTermuxInstalled(): Boolean {
-            return try {
-                packageManager.getPackageInfo("com.termux", 0)
-                true
-            } catch (_: PackageManager.NameNotFoundException) {
-                false
-            }
+        fun pythonReady(): Boolean = try {
+            ensurePython()
+            true
+        } catch (_: Exception) {
+            false
         }
 
         @JavascriptInterface
-        fun runCommand(command: String, workingDirectory: String, background: Boolean): String {
-            if (command.isBlank() || command.length > 4000) return "Invalid command"
-            if (!isTermuxInstalled()) return "Termux is not installed"
-            return try {
-                val intent = Intent("com.termux.RUN_COMMAND").apply {
-                    setClassName("com.termux", "com.termux.app.RunCommandService")
-                    putExtra("com.termux.RUN_COMMAND_PATH", "/data/data/com.termux/files/usr/bin/bash")
-                    putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf("-lc", command))
-                    putExtra("com.termux.RUN_COMMAND_WORKDIR", workingDirectory.ifBlank { "/data/data/com.termux/files/home" })
-                    putExtra("com.termux.RUN_COMMAND_BACKGROUND", background)
-                    putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "PhoneVPS")
-                }
-                startService(intent)
-                "Command sent to Termux"
-            } catch (e: SecurityException) {
-                "Permission denied. Grant PhoneVPS the 'Run commands in Termux environment' permission in Android App settings, and enable allow-external-apps in Termux."
-            } catch (e: Exception) {
-                "Could not start Termux command: ${e.message}"
-            }
+        fun runPython(code: String): String = try {
+            ensurePython()
+            Python.getInstance().getModule("phonevps").callAttr("execute", code).toString()
+        } catch (e: Exception) {
+            "Python error: ${e.message}"
         }
 
         @JavascriptInterface
-        fun openTermux(): String {
-            return try {
-                val launch = packageManager.getLaunchIntentForPackage("com.termux")
-                    ?: return "Could not open Termux"
-                startActivity(launch)
-                "Opening Termux"
-            } catch (e: Exception) {
-                "Could not open Termux: ${e.message}"
-            }
+        fun startHosting(): String = try {
+            val intent = Intent(this@MainActivity, PhoneVPSService::class.java)
+                .setAction(PhoneVPSService.ACTION_START)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+            "Hosting service start requested. Check the persistent PhoneVPS notification."
+        } catch (e: Exception) {
+            "Could not start hosting: ${e.message}"
+        }
+
+        @JavascriptInterface
+        fun stopHosting(): String = try {
+            startService(Intent(this@MainActivity, PhoneVPSService::class.java).setAction(PhoneVPSService.ACTION_STOP))
+            "Stop requested."
+        } catch (e: Exception) {
+            "Could not stop hosting: ${e.message}"
+        }
+
+        @JavascriptInterface
+        fun hostingStatus(): String = if (PhoneVPSService.running) "Running" else "Stopped"
+
+        @JavascriptInterface
+        fun filesList(): String = try {
+            val root = File(filesDir, "projects")
+            root.mkdirs()
+            JSONArray(root.listFiles()?.map { it.name } ?: emptyList<String>()).toString()
+        } catch (e: Exception) { "[]" }
+
+        @JavascriptInterface
+        fun readProjectFile(name: String): String = try {
+            val f = safeProjectFile(name)
+            if (f.isFile) f.readText() else ""
+        } catch (e: Exception) { "File error: ${e.message}" }
+
+        @JavascriptInterface
+        fun writeProjectFile(name: String, content: String): String = try {
+            val f = safeProjectFile(name)
+            f.parentFile?.mkdirs()
+            f.writeText(content)
+            "Saved ${f.name}"
+        } catch (e: Exception) { "File error: ${e.message}" }
+
+        private fun safeProjectFile(name: String): File {
+            require(name.isNotBlank() && !name.contains("..") && !name.startsWith("/")) { "Invalid file name" }
+            val root = File(filesDir, "projects").canonicalFile
+            val file = File(root, name).canonicalFile
+            require(file.path.startsWith(root.path + File.separator)) { "Path outside project folder" }
+            return file
+        }
+
+        private fun ensurePython() {
+            if (!Python.isStarted()) Python.start(AndroidPlatform(this@MainActivity))
         }
     }
 
