@@ -1,7 +1,16 @@
 const $=id=>document.getElementById(id);
 let currentFolder="";
-let terminalHistory=["PhoneVPS terminal initialized.","Type help to see supported commands."];
+let terminalHistory=["PhoneVPS terminal initialized.","Checking native Python bridge…","Type help to see supported commands."];
 function bridge(){return typeof window.PhoneVPS!=="undefined";}
+function renderTerminal(){
+ const out=$("terminalOutput");
+ if(!out)return;
+ out.textContent=terminalHistory.slice(-150).join("\n");
+ out.scrollTop=out.scrollHeight;
+}
+function terminalLog(value){terminalHistory.push(String(value));renderTerminal();}
+window.addEventListener("error",e=>terminalLog("APP JAVASCRIPT ERROR: "+(e.message||"Unknown error")+" ("+(e.filename||"")+")"));
+window.addEventListener("unhandledrejection",e=>terminalLog("APP PROMISE ERROR: "+String(e.reason)));
 function setServerState(status){
  const online=status==="Online";
  $("hostState").textContent=status;
@@ -12,31 +21,33 @@ function setServerState(status){
 }
 function refresh(){
  try{
-  if(!bridge()){$("pythonState").textContent="Unavailable";$("pythonDetail").textContent="Native app bridge missing";setServerState("Error: app bridge missing");return;}
+  if(!bridge()){$("pythonState").textContent="Unavailable";$("pythonDetail").textContent="Native app bridge missing";setServerState("Error: app bridge missing");terminalLog("ERROR: Android-to-app bridge is missing. Reinstall the latest APK.");return;}
   const ok=PhoneVPS.pythonReady();
   $("pythonState").textContent=ok?"Ready":"Error";
   $("pythonDetail").textContent=ok?"Embedded Python 3.11":"Python runtime failed — check app installation";
+  terminalLog(ok?"Python bridge connected.":"ERROR: Python runtime did not initialize.");
   setServerState(PhoneVPS.hostingStatus());
- }catch(e){$("pythonState").textContent="Error";$("pythonDetail").textContent=String(e);setServerState("Error: "+String(e));}
+ }catch(e){$("pythonState").textContent="Error";$("pythonDetail").textContent=String(e);setServerState("Error: "+String(e));terminalLog("BRIDGE CHECK ERROR: "+String(e));}
 }
 function showTab(tab){
  document.querySelectorAll(".view").forEach(x=>x.hidden=x.id!==tab);
  document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.tab===tab));
  if(tab==="files")loadFiles();
+ if(tab==="terminal")renderTerminal();
 }
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
-$("start").onclick=()=>{const result=PhoneVPS.startHosting();$("serverMessage").textContent=result;setTimeout(refresh,350);setTimeout(refresh,1200);};
-$("stop").onclick=()=>{const result=PhoneVPS.stopHosting();$("serverMessage").textContent=result;setTimeout(refresh,500);};
-$("openServer").onclick=()=>{if(PhoneVPS.hostingStatus()==="Online")window.open("http://127.0.0.1:8080","_blank");else $("serverMessage").textContent="Start the server first.";};
+$("start").onclick=()=>{try{const result=PhoneVPS.startHosting();$("serverMessage").textContent=result;setTimeout(refresh,350);setTimeout(refresh,1200);}catch(e){$("serverMessage").textContent="Start error: "+String(e);}};
+$("stop").onclick=()=>{try{const result=PhoneVPS.stopHosting();$("serverMessage").textContent=result;setTimeout(refresh,500);}catch(e){$("serverMessage").textContent="Stop error: "+String(e);}};
+$("openServer").onclick=()=>{try{if(PhoneVPS.hostingStatus()==="Online")window.open("http://127.0.0.1:8080","_blank");else $("serverMessage").textContent="Start the server first.";}catch(e){$("serverMessage").textContent=String(e);}};
 $("refresh").onclick=refresh;
 $("terminalRun").onclick=runTerminal;
 $("terminalInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();runTerminal();}});
-function renderTerminal(){ $("terminalOutput").textContent=terminalHistory.slice(-150).join("\n"); $("terminalOutput").scrollTop=$("terminalOutput").scrollHeight; }
 function runTerminal(){
  const command=$("terminalInput").value.trim();if(!command)return;
  $("terminalInput").value="";
- if(!bridge()){terminalHistory.push("$ "+command,"ERROR: Native PhoneVPS bridge is unavailable.");renderTerminal();return;}
- terminalHistory.push("$ "+command);
+ terminalHistory.push("$ "+command,"Running…");
+ renderTerminal();
+ if(!bridge()){terminalLog("ERROR: Native PhoneVPS bridge is unavailable.");return;}
  try{
   const result=PhoneVPS.runCommand(command);
   if(result==="__CLEAR__")terminalHistory=[];
@@ -70,7 +81,17 @@ $("newFile").onclick=()=>{$("fileEditor").hidden=false;$("fileName").value=curre
 $("newFolder").onclick=()=>{const name=prompt("Enter folder name");if(!name)return;const path=currentFolder?currentFolder+"/"+name:name;$("fileMessage").textContent=PhoneVPS.createFolder(path);loadFiles();};
 $("reloadFiles").onclick=loadFiles;
 $("saveFile").onclick=()=>{const name=$("fileName").value.trim();if(!name){$("fileMessage").textContent="Enter a file name first.";return;}const result=PhoneVPS.saveFile(name,$("fileContent").value);$("fileMessage").textContent=result;loadFiles();};
-$("runFile").onclick=()=>{const name=$("fileName").value.trim();if(!name){$("fileMessage").textContent="Save a Python file first.";return;}try{const result=PhoneVPS.runCommand("python "+JSON.stringify(name));terminalHistory.push("$ python "+name,String(result));renderTerminal();$("fileMessage").textContent="Finished. See Terminal tab for output.";}catch(e){terminalHistory.push("RUN ERROR: "+String(e));renderTerminal();$("fileMessage").textContent="Run failed: "+String(e);}};
+$("runFile").onclick=()=>{
+ const name=$("fileName").value.trim();if(!name){$("fileMessage").textContent="Save a Python file first.";return;}
+ terminalHistory.push("$ python "+name,"Starting Python file…");renderTerminal();
+ try{
+  const result=PhoneVPS.runCommand("python "+JSON.stringify(name));
+  terminalHistory.push(result===null||result===undefined?"ERROR: No result returned":String(result));
+  $("fileMessage").textContent="Execution returned. Open Terminal to see output.";
+ }catch(e){terminalHistory.push("RUN ERROR: "+(e&&e.stack?e.stack:String(e)));$("fileMessage").textContent="Run failed: "+String(e);}
+ renderTerminal();
+};
 $("deleteFile").onclick=()=>{const path=$("fileName").value;if(!path||!confirm("Delete "+path+"?"))return;$("fileMessage").textContent=PhoneVPS.deletePath(path);$("fileEditor").hidden=true;loadFiles();};
+renderTerminal();
 refresh();
-setInterval(()=>{if(bridge())setServerState(PhoneVPS.hostingStatus());},2000);
+setInterval(()=>{if(bridge())try{setServerState(PhoneVPS.hostingStatus());}catch(e){terminalLog("STATUS ERROR: "+String(e));}},2000);
