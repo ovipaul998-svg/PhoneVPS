@@ -1,5 +1,6 @@
 import contextlib
 import asyncio
+import builtins
 import io
 import os
 import shlex
@@ -218,8 +219,12 @@ def start_bot(workspace_path, filename="main.py"):
         try:
             with open(target, "r", encoding="utf-8") as handle:
                 source = handle.read()
+            safe_builtins = dict(vars(builtins))
+            def bot_print(*values, sep=" ", end="\\n", file=None, flush=False):
+                stream.write(sep.join(str(value) for value in values) + end)
+            safe_builtins["print"] = bot_print
             scope = {"__name__": "__main__", "__file__": target,
-                     "__builtins__": __builtins__}
+                     "__builtins__": safe_builtins}
             try:
                 import discord
                 def managed_run(client, token, **kwargs):
@@ -245,8 +250,7 @@ def start_bot(workspace_path, filename="main.py"):
             except ImportError:
                 with _bot_lock:
                     _bot_logs.append("ERROR: discord.py is not installed in this APK.")
-            with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
-                exec(compile(source, target, "exec"), scope, scope)
+            exec(compile(source, target, "exec"), scope, scope)
             with _bot_lock:
                 if _bot_state not in ("error", "stopping"):
                     _bot_state = "stopped"
