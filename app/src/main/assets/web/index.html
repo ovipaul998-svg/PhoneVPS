@@ -1,20 +1,17 @@
 <!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PhoneVPS</title><link rel="stylesheet" href="style.css"></head>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PhoneVPS</title><link rel="stylesheet" href="style.css"></head>
 <body>
 <header><div class="brand"><span class="logo">P</span><div><b>PhoneVPS</b><small>STANDALONE SERVER CONTROL</small></div></div><span class="status"><i></i> ANDROID</span></header>
 <main>
-<section class="welcome"><p class="eyebrow">CONTROL CENTER · V1.2</p><h1>Your phone.<br><em>Your server.</em></h1><p class="muted">Embedded Python runtime. No Termux. No root.</p></section>
-<section class="stats"><article><small>PYTHON ENGINE</small><strong id="pythonState">Checking</strong><span id="pythonDetail">Embedded runtime</span></article><article><small>HOSTING</small><strong id="hostState">Stopped</strong><span>Foreground service</span></article><article><small>PORT</small><strong>8080</strong><span>Local HTTP server</span></article></section>
+<section class="welcome"><p class="eyebrow">CONTROL CENTER · V1.3</p><h1>Your phone.<br><em>Your server.</em></h1><p class="muted">Embedded Python workspace. No Termux. No root.</p></section>
+<nav class="nav"><button class="active" data-tab="dashboard">Overview</button><button data-tab="terminal">Terminal</button><button data-tab="files">Files</button></nav>
+<div id="dashboard" class="view">
+<section class="stats"><article><small>PYTHON ENGINE</small><strong id="pythonState">Checking</strong><span id="pythonDetail">Embedded runtime</span></article><article><small>HOSTING</small><strong id="hostState">Stopped</strong><span>Foreground service</span></article><article><small>PORT</small><strong>8080</strong><span>Local web server</span></article></section>
 <section class="section"><div class="section-head"><h2>Server controls</h2><span>ON-DEVICE</span></div><div class="cards">
-<button class="tile" id="start"><b>▶</b><strong>Start hosting</strong><small>Run the built-in Python web server</small></button>
-<button class="tile" id="stop"><b>■</b><strong>Stop hosting</strong><small>Stop the background service</small></button>
-<button class="tile" id="openServer"><b>↗</b><strong>Open hosted page</strong><small>127.0.0.1:8080</small></button>
-<button class="tile" id="refresh"><b>↻</b><strong>Refresh status</strong><small>Check embedded Python engine</small></button>
-</div></section>
-<section class="section"><div class="section-head"><h2>Python console</h2><span>EMBEDDED PYTHON 3.11</span></div><div class="terminal"><textarea id="code" rows="4" spellcheck="false">print("Hello from PhoneVPS!")
-import sys
-print(sys.version)</textarea><button class="action" id="run">Run Python</button><pre id="output">Python console ready.</pre></div></section>
-<section class="notice"><b>Standalone runtime</b><p>Python runs inside this app. The hosting service displays an ongoing Android notification while active. This first standalone release includes Python and a local web server; Node.js runtime integration and full Ubuntu compatibility are still in development.</p></section>
-<footer>PhoneVPS <span>v1.2 · Embedded Python</span></footer>
+<button class="tile" id="start"><b>▶</b><strong>Start hosting</strong><small>Run your web project</small></button><button class="tile" id="stop"><b>■</b><strong>Stop hosting</strong><small>Stop the background service</small></button><button class="tile" id="openServer"><b>↗</b><strong>Open hosted page</strong><small>127.0.0.1:8080</small></button><button class="tile" id="refresh"><b>↻</b><strong>Refresh status</strong><small>Check server state</small></button></div></section>
+</div>
+<div id="terminal" class="view" hidden><section class="section"><div class="section-head"><h2>Python Terminal</h2><span>PYTHON 3.11</span></div><p class="muted">Run Python commands in the embedded runtime. This is a Python console, not a full Linux shell.</p><pre id="terminalOutput" class="console">PhoneVPS Python console ready.</pre><div class="command"><span>›</span><input id="terminalInput" placeholder="print('Hello PhoneVPS!')" autocomplete="off"><button id="terminalRun">Run</button></div></section></div>
+<div id="files" class="view" hidden><section class="section"><div class="section-head"><h2>Project files</h2><span>APP WORKSPACE</span></div><p id="pathLabel" class="muted">/projects/</p><div class="fileActions"><button id="newFile">+ New file</button><button id="newFolder">+ New folder</button></div><div id="fileList" class="fileList"></div><div id="fileEditor" hidden class="editor"><input id="fileName" placeholder="filename.py"><textarea id="fileContent" rows="12" spellcheck="false"></textarea><div class="fileActions"><button id="saveFile">Save file</button><button id="deleteFile">Delete</button></div><small id="fileMessage"></small></div></section></div>
+<section class="notice"><b>Current capabilities</b><p>PhoneVPS v1.3 adds a Python command console and a project file manager. The current hosted server serves the app's separate www folder; project files are stored in the private projects workspace. Uploading files, Node.js hosting, remote public hosting and full Ubuntu are not implemented yet.</p></section>
+<footer>PhoneVPS <span>v1.3 · Python workspace</span></footer>
 </main><script src="app.js"></script></body></html>
