@@ -5,6 +5,7 @@ import io
 import os
 import shlex
 import shutil
+import sys
 import threading
 import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -34,6 +35,8 @@ def _safe_path(path):
 def execute(code, workspace_path=None):
     output = io.StringIO()
     root = _set_workspace(workspace_path or os.path.join(os.environ.get("HOME", "/"), "projects"))
+    if root not in sys.path:
+        sys.path.insert(0, root)
     scope = {"__name__": "__main__", "__builtins__": __builtins__, "workspace": root}
     try:
         with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
@@ -194,7 +197,7 @@ def bot_status():
 
 def bot_logs():
     with _bot_lock:
-        return "\\n".join(_bot_logs[-200:]) or "No bot output yet."
+        return "\n".join(_bot_logs[-200:]) or "No bot output yet."
 
 def start_bot(workspace_path, filename="main.py"):
     global _bot_thread, _bot_state, _bot_client, _bot_loop
@@ -217,10 +220,12 @@ def start_bot(workspace_path, filename="main.py"):
         global _bot_state, _bot_client, _bot_loop
         stream = _BotLogStream()
         try:
+            if root not in sys.path:
+                sys.path.insert(0, root)
             with open(target, "r", encoding="utf-8") as handle:
                 source = handle.read()
             safe_builtins = dict(vars(builtins))
-            def bot_print(*values, sep=" ", end="\\n", file=None, flush=False):
+            def bot_print(*values, sep=" ", end="\n", file=None, flush=False):
                 stream.write(sep.join(str(value) for value in values) + end)
             safe_builtins["print"] = bot_print
             scope = {"__name__": "__main__", "__file__": target,
