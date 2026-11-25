@@ -27,6 +27,29 @@ jobs:
       - name: Verify build Python
         run: python3.11 --version
 
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - name: Test Rust core
+        run: cargo test --manifest-path rust/Cargo.toml
+
+      - name: Build standalone Rust CLI binary
+        run: cargo build --manifest-path rust/Cargo.toml --release --bin phonevps-cli
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build Rust native libraries for Android
+        run: |
+          NDK_DIR=$(ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null | sort -V | tail -n 1 || true)
+          if [ -z "$NDK_DIR" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018"
+            NDK_DIR="$ANDROID_HOME/ndk/27.2.12479018"
+          fi
+          export ANDROID_NDK_HOME="$NDK_DIR"
+          cargo ndk -t arm64-v8a -t armeabi-v7a -o app/src/main/jniLibs build --manifest-path rust/Cargo.toml --release
+
       - name: Read app version
         id: version
         run: |
@@ -59,16 +82,17 @@ jobs:
       - name: Build debug and release APKs
         run: gradle assembleDebug assembleRelease
 
-      - name: Stage APK files
+      - name: Stage release files
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/debug/app-debug.apk "dist/PhoneVPS-v${{ steps.version.outputs.name }}-debug.apk"
           cp app/build/outputs/apk/release/app-release.apk "dist/PhoneVPS-v${{ steps.version.outputs.name }}-release.apk"
+          cp rust/target/release/phonevps-cli "dist/phonevps-cli-linux-x86_64"
 
       - uses: actions/upload-artifact@v4
         with:
           name: PhoneVPS-APKs
-          path: dist/*.apk
+          path: dist/*
           retention-days: 30
 
       - name: Publish GitHub Release
@@ -81,3 +105,4 @@ jobs:
           files: |
             dist/PhoneVPS-v${{ steps.version.outputs.name }}-release.apk
             dist/PhoneVPS-v${{ steps.version.outputs.name }}-debug.apk
+            dist/phonevps-cli-linux-x86_64
