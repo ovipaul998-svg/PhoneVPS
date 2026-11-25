@@ -107,6 +107,31 @@ class MainActivity : Activity() {
 
     inner class AppBridge {
         @JavascriptInterface
+        fun rustReady(): Boolean = RustBridge.available
+
+        @JavascriptInterface
+        fun rustVersion(): String = if (RustBridge.available) {
+            try { RustBridge.nativeVersion() } catch (e: Throwable) { "Rust error: ${e.message}" }
+        } else {
+            "Unavailable"
+        }
+
+        @JavascriptInterface
+        fun getEngine(): String = PhoneVPSService.getConfiguredEngine(this@MainActivity)
+
+        @JavascriptInterface
+        fun getActiveEngine(): String = PhoneVPSService.activeEngine
+
+        @JavascriptInterface
+        fun setEngine(engine: String): String = try {
+            PhoneVPSService.setConfiguredEngine(this@MainActivity, engine)
+            val label = if (engine.trim().equals(PhoneVPSService.ENGINE_RUST, true)) "Rust Native" else "Python 3.11"
+            if (PhoneVPSService.running) "Engine set to $label. Restart server to apply." else "Engine set to $label."
+        } catch (e: Exception) {
+            "Engine error: ${e.message}"
+        }
+
+        @JavascriptInterface
         fun pythonReady(): Boolean = try {
             ensurePython()
             true
@@ -124,12 +149,15 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun runCommand(command: String): String = try {
-            Log.i("PhoneVPS", "Terminal command received: " + command.take(120))
+            val projectsPath = File(filesDir, "projects").apply { mkdirs() }.absolutePath
+            val engine = PhoneVPSService.getConfiguredEngine(this@MainActivity)
+            if (engine == PhoneVPSService.ENGINE_RUST && RustBridge.available) {
+                val rustOut = RustBridge.nativeExecuteCommand(command, projectsPath)
+                if (rustOut != "__USE_PYTHON__") return rustOut
+            }
             ensurePython()
-            val result = Python.getInstance().getModule("phonevps")
-                .callAttr("execute_command", command, File(filesDir, "projects").absolutePath).toString()
-            Log.i("PhoneVPS", "Terminal command completed; output length=" + result.length)
-            result
+            Python.getInstance().getModule("phonevps")
+                .callAttr("execute_command", command, projectsPath).toString()
         } catch (e: Throwable) {
             Log.e("PhoneVPS", "Terminal command failed", e)
             "Command error: " + e.javaClass.simpleName + ": " + e.message
