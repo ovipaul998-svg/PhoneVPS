@@ -148,19 +148,21 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface
-        fun runCommand(command: String): String = try {
-            val projectsPath = File(filesDir, "projects").apply { mkdirs() }.absolutePath
-            val engine = PhoneVPSService.getConfiguredEngine(this@MainActivity)
-            if (engine == PhoneVPSService.ENGINE_RUST && RustBridge.available) {
-                val rustOut = RustBridge.nativeExecuteCommand(command, projectsPath)
-                if (rustOut != "__USE_PYTHON__") return rustOut
+        fun runCommand(command: String): String {
+            return try {
+                val projectsPath = File(filesDir, "projects").apply { mkdirs() }.absolutePath
+                val engine = PhoneVPSService.getConfiguredEngine(this@MainActivity)
+                if (engine == PhoneVPSService.ENGINE_RUST && RustBridge.available) {
+                    val rustOut = RustBridge.nativeExecuteCommand(command, projectsPath)
+                    if (rustOut != "__USE_PYTHON__") return rustOut
+                }
+                ensurePython()
+                Python.getInstance().getModule("phonevps")
+                    .callAttr("execute_command", command, projectsPath).toString()
+            } catch (e: Throwable) {
+                Log.e("PhoneVPS", "Terminal command failed", e)
+                "Command error: " + e.javaClass.simpleName + ": " + e.message
             }
-            ensurePython()
-            Python.getInstance().getModule("phonevps")
-                .callAttr("execute_command", command, projectsPath).toString()
-        } catch (e: Throwable) {
-            Log.e("PhoneVPS", "Terminal command failed", e)
-            "Command error: " + e.javaClass.simpleName + ": " + e.message
         }
 
         @JavascriptInterface
