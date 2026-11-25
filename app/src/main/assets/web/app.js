@@ -55,6 +55,7 @@ function setServerState(status){
  top.appendChild(document.createElement("i"));
  top.appendChild(document.createTextNode(" "+(online?"ONLINE · "+eng.toUpperCase():status.toUpperCase())));
  $("serverMessage").textContent=online?"Server is ONLINE ("+eng+") · Local: http://127.0.0.1:"+port+" · LAN: http://"+(PhoneVPS.lanAddress?PhoneVPS.lanAddress():"your-phone-ip")+":"+port:status.startsWith("Error")?status:"Server is offline.";
+ $("serverMessage").className="messageBanner "+(online?"green":status.startsWith("Error")?"red":"");
 }
 function refreshTokenStatus(){
  if(!bridge()||!PhoneVPS.hasBotToken)return;
@@ -86,6 +87,7 @@ function showTab(tab){
  if(tab==="bot")refreshTokenStatus();
 }
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+document.querySelectorAll(".quickCmd").forEach(b=>b.onclick=()=>{$("terminalInput").value=b.dataset.cmd;runTerminal();});
 function switchEngine(engine){
  if(!bridge()||!PhoneVPS.setEngine)return;
  $("serverMessage").textContent=PhoneVPS.setEngine(engine);
@@ -142,7 +144,7 @@ function loadFiles(){
  $("pathLabel").textContent="/projects/"+currentFolder;
  const list=$("fileList");list.innerHTML="";
  if(currentFolder){const up=document.createElement("button");up.className="file";up.textContent="⬅ Parent folder";up.onclick=()=>{currentFolder=currentFolder.includes("/")?currentFolder.slice(0,currentFolder.lastIndexOf("/")):"";loadFiles();};list.appendChild(up);}
- if(!data.length){const empty=document.createElement("p");empty.className="muted";empty.textContent="No files here yet. Tap Create file to add your first project.";list.appendChild(empty);}
+ if(!data.length){const empty=document.createElement("p");empty.className="muted";empty.textContent="No files here yet. Tap + New file or Upload to add one.";list.appendChild(empty);}
  data.forEach(item=>{
   const path=currentFolder?currentFolder+"/"+item.name:item.name;
   const b=document.createElement("button");b.className="file";
@@ -179,7 +181,7 @@ function refreshBot(){
  try{
   const state=PhoneVPS.botStatus();
   $("botState").textContent="Bot status: "+state;
-  $("botState").className="message "+(state==="running"?"green":state==="error"?"red":"");
+  $("botState").className="messageBanner "+(state==="running"?"green":state==="error"?"red":"");
   $("botLogs").textContent=PhoneVPS.botLogs();
  }catch(e){$("botState").textContent="Bot bridge error: "+String(e);}
 }
