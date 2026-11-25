@@ -12,6 +12,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 _server = None
 _server_thread = None
+_server_port = 8080
 _server_lock = threading.RLock()
 _workspace = None
 _current_dir = None
@@ -141,21 +142,27 @@ def execute_command(command, workspace_path):
         return type(exc).__name__ + ": " + str(exc)
 
 def start_server(app_files_dir, port=8080):
-    global _server, _server_thread
+    global _server, _server_thread, _server_port
     with _server_lock:
+        target_port = int(port)
         if _server is not None:
-            return "already running"
+            if _server_port == target_port:
+                return "already running"
+            _server.shutdown()
+            _server.server_close()
+            _server = None
+            _server_thread = None
         root = _set_workspace(os.path.join(app_files_dir, "projects"))
         index = os.path.join(root, "index.html")
         if not os.path.exists(index):
             with open(index, "w", encoding="utf-8") as f:
                 f.write("<!doctype html><meta name='viewport' content='width=device-width'><h1>PhoneVPS is online</h1><p>Edit projects/index.html in PhoneVPS.</p>")
         handler = lambda *args, **kwargs: SimpleHTTPRequestHandler(*args, directory=root, **kwargs)
-        server = ThreadingHTTPServer(("0.0.0.0", int(port)), handler)
+        server = ThreadingHTTPServer(("0.0.0.0", target_port), handler)
         server.daemon_threads = True
         thread = threading.Thread(target=server.serve_forever, name="PhoneVPS-HTTP", daemon=True)
         thread.start()
-        _server, _server_thread = server, thread
+        _server, _server_thread, _server_port = server, thread, target_port
         return "started"
 
 def stop_server():
@@ -179,6 +186,7 @@ _bot_state = "stopped"
 _bot_logs = []
 _bot_client = None
 _bot_loop = None
+_bot_stop_requested = threading.Event()
 
 class _BotLogStream:
     def write(self, value):
@@ -189,17 +197,27 @@ class _BotLogStream:
     def flush(self):
         pass
 
+def _read_saved_token(root):
+    token_path = os.path.join(os.path.dirname(root), "bot_token.txt")
+    if os.path.isfile(token_path):
+        try:
+            with open(token_path, "r", encoding="utf-8") as handle:
+                return handle.read().strip()
+        except OSError:
+            return ""
+    return ""
+
 def bot_status():
     with _bot_lock:
         if _bot_thread is None or not _bot_thread.is_alive():
-            return "stopped" if _bot_state == "running" else _bot_state
+            return "stopped" if _bot_state in ("running", "restarting") else _bot_state
         return _bot_state
 
 def bot_logs():
     with _bot_lock:
         return "\n".join(_bot_logs[-200:]) or "No bot output yet."
 
-def start_bot(workspace_path, filename="main.py"):
+def start_bot(workspace_path, filename="main.py", auto_restart=False):
     global _bot_thread, _bot_state, _bot_client, _bot_loop
     root = _set_workspace(workspace_path)
     target = os.path.abspath(os.path.join(root, filename))
@@ -210,6 +228,7 @@ def start_bot(workspace_path, filename="main.py"):
     with _bot_lock:
         if _bot_thread is not None and _bot_thread.is_alive():
             return "Bot runner is already active."
+        _bot_stop_requested.clear()
         _bot_logs.clear()
         _bot_logs.append("Loading saved file: /projects/" + filename)
         _bot_state = "starting"
@@ -219,55 +238,82 @@ def start_bot(workspace_path, filename="main.py"):
     def worker():
         global _bot_state, _bot_client, _bot_loop
         stream = _BotLogStream()
+        max_restarts = 3
+        restarts = 0
         try:
-            if root not in sys.path:
-                sys.path.insert(0, root)
-            with open(target, "r", encoding="utf-8") as handle:
-                source = handle.read()
-            safe_builtins = dict(vars(builtins))
-            def bot_print(*values, sep=" ", end="\n", file=None, flush=False):
-                stream.write(sep.join(str(value) for value in values) + end)
-            safe_builtins["print"] = bot_print
-            scope = {"__name__": "__main__", "__file__": target,
-                     "__builtins__": safe_builtins}
-            try:
-                import discord
-                def managed_run(client, token, **kwargs):
-                    global _bot_client, _bot_loop, _bot_state
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    with _bot_lock:
-                        _bot_client, _bot_loop = client, loop
-                        _bot_state = "running"
-                        _bot_logs.append("Discord client connecting…")
+            while True:
+                crashed = False
+                try:
+                    if root not in sys.path:
+                        sys.path.insert(0, root)
+                    saved_token = _read_saved_token(root)
+                    if saved_token:
+                        os.environ["DISCORD_TOKEN"] = saved_token
+                        os.environ["BOT_TOKEN"] = saved_token
+                    with open(target, "r", encoding="utf-8") as handle:
+                        source = handle.read()
+                    safe_builtins = dict(vars(builtins))
+                    def bot_print(*values, sep=" ", end="\n", file=None, flush=False):
+                        stream.write(sep.join(str(value) for value in values) + end)
+                    safe_builtins["print"] = bot_print
+                    scope = {"__name__": "__main__", "__file__": target,
+                             "__builtins__": safe_builtins}
                     try:
-                        loop.run_until_complete(client.start(token, reconnect=kwargs.get("reconnect", True)))
-                    finally:
-                        if not loop.is_closed():
-                            pending = asyncio.all_tasks(loop)
-                            for task in pending:
-                                task.cancel()
-                            if pending:
-                                loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                            loop.close()
-                        asyncio.set_event_loop(None)
-                discord.Client.run = managed_run
-            except ImportError:
-                with _bot_lock:
-                    _bot_logs.append("ERROR: discord.py is not installed in this APK.")
-            exec(compile(source, target, "exec"), scope, scope)
-            with _bot_lock:
-                if _bot_state not in ("error", "stopping"):
-                    _bot_state = "stopped"
-                _bot_logs.append("Bot script exited.")
-        except BaseException:
-            with _bot_lock:
-                _bot_state = "error"
-                _bot_logs.extend(traceback.format_exc().splitlines())
-                del _bot_logs[:-400]
+                        import discord
+                        def managed_run(client, token=None, **kwargs):
+                            global _bot_client, _bot_loop, _bot_state
+                            resolved_token = token or saved_token or os.environ.get("DISCORD_TOKEN", "")
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            with _bot_lock:
+                                _bot_client, _bot_loop = client, loop
+                                _bot_state = "running"
+                                _bot_logs.append("Discord client connecting…")
+                            try:
+                                loop.run_until_complete(client.start(resolved_token, reconnect=kwargs.get("reconnect", True)))
+                            finally:
+                                if not loop.is_closed():
+                                    pending = asyncio.all_tasks(loop)
+                                    for task in pending:
+                                        task.cancel()
+                                    if pending:
+                                        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                                    loop.close()
+                                asyncio.set_event_loop(None)
+                        discord.Client.run = managed_run
+                    except ImportError:
+                        with _bot_lock:
+                            _bot_logs.append("ERROR: discord.py is not installed in this APK.")
+                    exec(compile(source, target, "exec"), scope, scope)
+                    with _bot_lock:
+                        if _bot_state not in ("error", "stopping"):
+                            _bot_state = "stopped"
+                        _bot_logs.append("Bot script exited.")
+                except BaseException:
+                    if _bot_stop_requested.is_set():
+                        break
+                    crashed = True
+                    with _bot_lock:
+                        _bot_state = "error"
+                        _bot_logs.extend(traceback.format_exc().splitlines())
+                        del _bot_logs[:-400]
+
+                if crashed and auto_restart and not _bot_stop_requested.is_set() and restarts < max_restarts:
+                    restarts += 1
+                    with _bot_lock:
+                        _bot_state = "restarting"
+                        _bot_logs.append(f"Bot crashed. Auto-restarting in 5s (attempt {restarts}/{max_restarts})…")
+                    if _bot_stop_requested.wait(5.0):
+                        break
+                    with _bot_lock:
+                        _bot_state = "starting"
+                        _bot_client = None
+                        _bot_loop = None
+                    continue
+                break
         finally:
             with _bot_lock:
-                if _bot_state == "stopping":
+                if _bot_stop_requested.is_set() or _bot_state == "stopping":
                     _bot_state = "stopped"
                 _bot_client = None
                 _bot_loop = None
@@ -279,6 +325,7 @@ def start_bot(workspace_path, filename="main.py"):
 def stop_bot():
     global _bot_state
     with _bot_lock:
+        _bot_stop_requested.set()
         if _bot_thread is None or not _bot_thread.is_alive():
             _bot_state = "stopped"
             return "Bot is already stopped."
