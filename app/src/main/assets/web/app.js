@@ -1,7 +1,27 @@
 const $=id=>document.getElementById(id);
 let currentFolder="";
 let terminalHistory=["PhoneVPS terminal initialized.","Checking native Python bridge…","Type help to see supported commands."];
+let cmdHistory=[];
+let cmdHistoryIndex=-1;
 function bridge(){return typeof window.PhoneVPS!=="undefined";}
+function applyTheme(theme){
+ const light=theme==="light";
+ document.body.classList.toggle("light",light);
+ const btn=$("themeToggle");
+ if(btn)btn.textContent=light?"🌙 Dark":"☀ Light";
+ try{localStorage.setItem("phonevps_theme",light?"light":"dark");}catch(_){}
+}
+applyTheme((()=>{try{return localStorage.getItem("phonevps_theme")||"dark";}catch(_){return"dark";}})());
+if($("themeToggle"))$("themeToggle").onclick=()=>applyTheme(document.body.classList.contains("light")?"dark":"light");
+function configuredPort(){return bridge()&&PhoneVPS.getServerPort?PhoneVPS.getServerPort():8080;}
+function activePort(){return bridge()&&PhoneVPS.getActivePort?PhoneVPS.getActivePort():configuredPort();}
+function syncPortUI(){
+ const cfg=configuredPort();
+ const act=activePort();
+ if($("portDisplay"))$("portDisplay").textContent=String(act);
+ if($("portInput")&&document.activeElement!==$("portInput"))$("portInput").value=String(cfg);
+ if($("openServerHint"))$("openServerHint").textContent="http://127.0.0.1:"+act;
+}
 function renderTerminal(){
  const out=$("terminalOutput");
  if(!out)return;
@@ -13,11 +33,21 @@ window.addEventListener("error",e=>terminalLog("APP JAVASCRIPT ERROR: "+(e.messa
 window.addEventListener("unhandledrejection",e=>terminalLog("APP PROMISE ERROR: "+String(e.reason)));
 function setServerState(status){
  const online=status==="Online";
+ const port=activePort();
+ syncPortUI();
  $("hostState").textContent=status;
  $("hostState").className=online?"green":status.startsWith("Error")?"red":"";
- $("hostDetail").textContent=online?"Serving /projects on port 8080":status.startsWith("Error")?"Startup failed":"Not hosting";
- const top=$("topStatus");top.textContent="";top.appendChild(document.createElement("i"));top.appendChild(document.createTextNode(" "+(online?"ONLINE":status.toUpperCase())));
- $("serverMessage").textContent=online?"Server is ONLINE · Local: http://127.0.0.1:8080 · LAN: http://"+(PhoneVPS.lanAddress?PhoneVPS.lanAddress():"your-phone-ip")+":8080":status.startsWith("Error")?status:"Server is offline.";
+ $("hostDetail").textContent=online?"Serving /projects on port "+port:status.startsWith("Error")?"Startup failed":"Not hosting";
+ const top=$("topStatus");
+ top.textContent="";
+ top.appendChild(document.createElement("i"));
+ top.appendChild(document.createTextNode(" "+(online?"ONLINE":status.toUpperCase())));
+ $("serverMessage").textContent=online?"Server is ONLINE · Local: http://127.0.0.1:"+port+" · LAN: http://"+(PhoneVPS.lanAddress?PhoneVPS.lanAddress():"your-phone-ip")+":"+port:status.startsWith("Error")?status:"Server is offline.";
+}
+function refreshTokenStatus(){
+ if(!bridge()||!PhoneVPS.hasBotToken)return;
+ try{$("tokenStatus").textContent=PhoneVPS.hasBotToken()?"Token saved securely outside /projects.":"No token saved yet.";}
+ catch(e){$("tokenStatus").textContent="Token check failed: "+String(e);}
 }
 function refresh(){
  try{
@@ -26,7 +56,9 @@ function refresh(){
   $("pythonState").textContent=ok?"Ready":"Error";
   $("pythonDetail").textContent=ok?"Embedded Python 3.11":"Python runtime failed — check app installation";
   terminalLog(ok?"Python bridge connected.":"ERROR: Python runtime did not initialize.");
+  syncPortUI();
   setServerState(PhoneVPS.hostingStatus());
+  refreshTokenStatus();
  }catch(e){$("pythonState").textContent="Error";$("pythonDetail").textContent=String(e);setServerState("Error: "+String(e));terminalLog("BRIDGE CHECK ERROR: "+String(e));}
 }
 function showTab(tab){
@@ -34,16 +66,40 @@ function showTab(tab){
  document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.tab===tab));
  if(tab==="files")loadFiles();
  if(tab==="terminal")renderTerminal();
+ if(tab==="bot")refreshTokenStatus();
 }
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 $("start").onclick=()=>{try{const result=PhoneVPS.startHosting();$("serverMessage").textContent=result;setTimeout(refresh,350);setTimeout(refresh,1200);}catch(e){$("serverMessage").textContent="Start error: "+String(e);}};
 $("stop").onclick=()=>{try{const result=PhoneVPS.stopHosting();$("serverMessage").textContent=result;setTimeout(refresh,500);}catch(e){$("serverMessage").textContent="Stop error: "+String(e);}};
-$("openServer").onclick=()=>{try{if(PhoneVPS.hostingStatus()==="Online")window.open("http://127.0.0.1:8080","_blank");else $("serverMessage").textContent="Start the server first.";}catch(e){$("serverMessage").textContent=String(e);}};
+$("openServer").onclick=()=>{try{if(PhoneVPS.hostingStatus()==="Online")window.open("http://127.0.0.1:"+activePort(),"_blank");else $("serverMessage").textContent="Start the server first.";}catch(e){$("serverMessage").textContent=String(e);}};
 $("refresh").onclick=refresh;
+$("savePort").onclick=()=>{
+ if(!bridge()||!PhoneVPS.setServerPort)return;
+ const port=parseInt($("portInput").value,10);
+ if(Number.isNaN(port)||port<1024||port>65535){$("serverMessage").textContent="Enter a port between 1024 and 65535.";return;}
+ $("serverMessage").textContent=PhoneVPS.setServerPort(port);
+ syncPortUI();
+};
 $("terminalRun").onclick=runTerminal;
-$("terminalInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();runTerminal();}});
+$("terminalInput").addEventListener("keydown",e=>{
+ if(e.key==="Enter"){e.preventDefault();runTerminal();return;}
+ if(e.key==="ArrowUp"){
+  if(!cmdHistory.length)return;
+  e.preventDefault();
+  if(cmdHistoryIndex===-1)cmdHistoryIndex=cmdHistory.length;
+  if(cmdHistoryIndex>0)cmdHistoryIndex--;
+  $("terminalInput").value=cmdHistory[cmdHistoryIndex]||"";
+ }else if(e.key==="ArrowDown"){
+  if(!cmdHistory.length||cmdHistoryIndex===-1)return;
+  e.preventDefault();
+  if(cmdHistoryIndex<cmdHistory.length-1){cmdHistoryIndex++;$("terminalInput").value=cmdHistory[cmdHistoryIndex];}
+  else{cmdHistoryIndex=-1;$("terminalInput").value="";}
+ }
+});
 function runTerminal(){
  const command=$("terminalInput").value.trim();if(!command)return;
+ if(!cmdHistory.length||cmdHistory[cmdHistory.length-1]!==command){cmdHistory.push(command);if(cmdHistory.length>50)cmdHistory.shift();}
+ cmdHistoryIndex=-1;
  $("terminalInput").value="";
  terminalHistory.push("$ "+command,"Running…");
  renderTerminal();
@@ -79,6 +135,8 @@ function openFile(path){
 }
 $("newFile").onclick=()=>{$("fileEditor").hidden=false;$("fileName").value=currentFolder?(currentFolder+"/main.py"):"main.py";$("fileContent").value="";$("fileMessage").textContent="Enter a filename and write your code, then save.";};
 $("newFolder").onclick=()=>{const name=prompt("Enter folder name");if(!name)return;const path=currentFolder?currentFolder+"/"+name:name;$("fileMessage").textContent=PhoneVPS.createFolder(path);loadFiles();};
+$("uploadFile").onclick=()=>{if(bridge()&&PhoneVPS.pickFileToUpload)PhoneVPS.pickFileToUpload(currentFolder);};
+window.onNativeFileUploaded=msg=>{$("fileMessage").textContent=msg;loadFiles();};
 $("reloadFiles").onclick=loadFiles;
 $("saveFile").onclick=()=>{const name=$("fileName").value.trim();if(!name){$("fileMessage").textContent="Enter a file name first.";return;}const result=PhoneVPS.saveFile(name,$("fileContent").value);$("fileMessage").textContent=result;loadFiles();};
 $("runFile").onclick=()=>{
@@ -101,10 +159,17 @@ function refreshBot(){
   $("botLogs").textContent=PhoneVPS.botLogs();
  }catch(e){$("botState").textContent="Bot bridge error: "+String(e);}
 }
+$("saveToken").onclick=()=>{
+ if(!bridge()||!PhoneVPS.saveBotToken)return;
+ $("botState").textContent=PhoneVPS.saveBotToken($("botToken").value);
+ $("botToken").value="";
+ refreshTokenStatus();
+};
 $("startBot").onclick=()=>{
  const filename=$("botFile").value.trim()||"main.py";
+ const autoRestart=Boolean($("botAutoRestart")&&$("botAutoRestart").checked);
  try{
-  $("botState").textContent=PhoneVPS.startBot(filename);
+  $("botState").textContent=PhoneVPS.startBot(filename,autoRestart);
   setTimeout(refreshBot,400);
   setTimeout(refreshBot,1400);
  }catch(e){$("botState").textContent="Start failed: "+String(e);}
