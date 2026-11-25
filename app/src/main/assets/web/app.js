@@ -1,6 +1,6 @@
 const $=id=>document.getElementById(id);
 let currentFolder="";
-let terminalHistory=["PhoneVPS terminal initialized.","Checking native Python bridge…","Type help to see supported commands."];
+let terminalHistory=["PhoneVPS terminal initialized.","Checking Rust & Python engines…","Type help to see supported commands."];
 let cmdHistory=[];
 let cmdHistoryIndex=-1;
 function bridge(){return typeof window.PhoneVPS!=="undefined";}
@@ -15,12 +15,23 @@ applyTheme((()=>{try{return localStorage.getItem("phonevps_theme")||"dark";}catc
 if($("themeToggle"))$("themeToggle").onclick=()=>applyTheme(document.body.classList.contains("light")?"dark":"light");
 function configuredPort(){return bridge()&&PhoneVPS.getServerPort?PhoneVPS.getServerPort():8080;}
 function activePort(){return bridge()&&PhoneVPS.getActivePort?PhoneVPS.getActivePort():configuredPort();}
+function configuredEngine(){return bridge()&&PhoneVPS.getEngine?PhoneVPS.getEngine():"python";}
+function activeEngine(){return bridge()&&PhoneVPS.getActiveEngine?PhoneVPS.getActiveEngine():configuredEngine();}
+function syncEngineUI(){
+ const cfg=configuredEngine();
+ const isRust=cfg==="rust";
+ if($("engineRust"))$("engineRust").classList.toggle("active",isRust);
+ if($("enginePython"))$("enginePython").classList.toggle("active",!isRust);
+ if($("engineBadge"))$("engineBadge").textContent="Engine: "+(isRust?"Rust Native":"Python 3.11");
+ if($("terminalEngineLabel"))$("terminalEngineLabel").textContent=isRust?"RUST NATIVE SHELL":"PYTHON 3.11 SHELL";
+}
 function syncPortUI(){
  const cfg=configuredPort();
  const act=activePort();
  if($("portDisplay"))$("portDisplay").textContent=String(act);
  if($("portInput")&&document.activeElement!==$("portInput"))$("portInput").value=String(cfg);
  if($("openServerHint"))$("openServerHint").textContent="http://127.0.0.1:"+act;
+ syncEngineUI();
 }
 function renderTerminal(){
  const out=$("terminalOutput");
@@ -34,15 +45,16 @@ window.addEventListener("unhandledrejection",e=>terminalLog("APP PROMISE ERROR: 
 function setServerState(status){
  const online=status==="Online";
  const port=activePort();
+ const eng=activeEngine()==="rust"?"Rust":"Python";
  syncPortUI();
  $("hostState").textContent=status;
  $("hostState").className=online?"green":status.startsWith("Error")?"red":"";
- $("hostDetail").textContent=online?"Serving /projects on port "+port:status.startsWith("Error")?"Startup failed":"Not hosting";
+ $("hostDetail").textContent=online?"Serving /projects on port "+port+" ("+eng+")":status.startsWith("Error")?"Startup failed":"Not hosting";
  const top=$("topStatus");
  top.textContent="";
  top.appendChild(document.createElement("i"));
- top.appendChild(document.createTextNode(" "+(online?"ONLINE":status.toUpperCase())));
- $("serverMessage").textContent=online?"Server is ONLINE · Local: http://127.0.0.1:"+port+" · LAN: http://"+(PhoneVPS.lanAddress?PhoneVPS.lanAddress():"your-phone-ip")+":"+port:status.startsWith("Error")?status:"Server is offline.";
+ top.appendChild(document.createTextNode(" "+(online?"ONLINE · "+eng.toUpperCase():status.toUpperCase())));
+ $("serverMessage").textContent=online?"Server is ONLINE ("+eng+") · Local: http://127.0.0.1:"+port+" · LAN: http://"+(PhoneVPS.lanAddress?PhoneVPS.lanAddress():"your-phone-ip")+":"+port:status.startsWith("Error")?status:"Server is offline.";
 }
 function refreshTokenStatus(){
  if(!bridge()||!PhoneVPS.hasBotToken)return;
@@ -51,11 +63,16 @@ function refreshTokenStatus(){
 }
 function refresh(){
  try{
-  if(!bridge()){$("pythonState").textContent="Unavailable";$("pythonDetail").textContent="Native app bridge missing";setServerState("Error: app bridge missing");terminalLog("ERROR: Android-to-app bridge is missing. Reinstall the latest APK.");return;}
+  if(!bridge()){$("rustState").textContent="Unavailable";$("pythonState").textContent="Unavailable";$("pythonDetail").textContent="Native app bridge missing";setServerState("Error: app bridge missing");terminalLog("ERROR: Android-to-app bridge is missing. Reinstall the latest APK.");return;}
+  const rustOk=PhoneVPS.rustReady?PhoneVPS.rustReady():false;
+  $("rustState").textContent=rustOk?"Ready":"Unavailable";
+  $("rustState").className=rustOk?"green":"";
+  $("rustDetail").textContent=rustOk&&PhoneVPS.rustVersion?PhoneVPS.rustVersion():"Rust library not loaded";
   const ok=PhoneVPS.pythonReady();
   $("pythonState").textContent=ok?"Ready":"Error";
+  $("pythonState").className=ok?"green":"red";
   $("pythonDetail").textContent=ok?"Embedded Python 3.11":"Python runtime failed — check app installation";
-  terminalLog(ok?"Python bridge connected.":"ERROR: Python runtime did not initialize.");
+  terminalLog("Engines: Rust="+(rustOk?"Ready":"Unavailable")+", Python="+(ok?"Ready":"Error"));
   syncPortUI();
   setServerState(PhoneVPS.hostingStatus());
   refreshTokenStatus();
@@ -69,6 +86,13 @@ function showTab(tab){
  if(tab==="bot")refreshTokenStatus();
 }
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+function switchEngine(engine){
+ if(!bridge()||!PhoneVPS.setEngine)return;
+ $("serverMessage").textContent=PhoneVPS.setEngine(engine);
+ syncEngineUI();
+}
+if($("engineRust"))$("engineRust").onclick=()=>switchEngine("rust");
+if($("enginePython"))$("enginePython").onclick=()=>switchEngine("python");
 $("start").onclick=()=>{try{const result=PhoneVPS.startHosting();$("serverMessage").textContent=result;setTimeout(refresh,350);setTimeout(refresh,1200);}catch(e){$("serverMessage").textContent="Start error: "+String(e);}};
 $("stop").onclick=()=>{try{const result=PhoneVPS.stopHosting();$("serverMessage").textContent=result;setTimeout(refresh,500);}catch(e){$("serverMessage").textContent="Stop error: "+String(e);}};
 $("openServer").onclick=()=>{try{if(PhoneVPS.hostingStatus()==="Online")window.open("http://127.0.0.1:"+activePort(),"_blank");else $("serverMessage").textContent="Start the server first.";}catch(e){$("serverMessage").textContent=String(e);}};
