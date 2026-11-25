@@ -2,12 +2,13 @@
 
 Standalone Android server dashboard. No Termux and no root required.
 
-## Current build (v1.2)
+## Current build (v1.8)
 - Python 3.11 embedded in the APK using Chaquopy.
 - Built-in Python console.
+- Managed background Python / Discord bot runner (`discord.py 2.5.2`, `aiohttp 3.10.10`).
 - Android foreground service with persistent notification while hosting.
 - Local Python HTTP server on 127.0.0.1:8080.
-- App-private web root at files/www.
+- Shared `/projects` workspace used by the file manager, terminal, web server, and bot runner.
 
 ## Build
 GitHub Actions builds a debug APK on every push to main. Download the `PhoneVPS-debug-apk` artifact from the successful workflow run.
